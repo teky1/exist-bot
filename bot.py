@@ -42,13 +42,13 @@ role_map = {
 
 @client.command(name="register")
 async def register(ctx: commands.Context, ign):
-    if ign in ign_uuid_cache:
-        data = requests.get(f"https://api.hypixel.net/player?key={hypixel_api_key}&uuid={ign_uuid_cache[ign]}").json()
+    if ign.lower() in ign_uuid_cache:
+        data = requests.get(f"https://api.hypixel.net/player?key={hypixel_api_key}&uuid={ign_uuid_cache[ign.lower()]}").json()
     else:
         data = requests.get(f"https://api.hypixel.net/player?key={hypixel_api_key}&name={ign}").json()
         if data["success"]:
             if data["player"]:
-                ign_uuid_cache[ign] = data["player"]["uuid"]
+                ign_uuid_cache[ign.lower()] = data["player"]["uuid"]
             else:
                 await ctx.send("I couldn't find a Minecraft account with that username :P")
                 return
@@ -56,6 +56,8 @@ async def register(ctx: commands.Context, ign):
             print(data)
             await ctx.send("An error occurred. Please try again in a few minutes and if it still doesn't work DM <@!258048636653535234>")
             return
+
+    ign = data["player"]["displayname"]
 
     try:
         discord = data["player"]["socialMedia"]["links"]["DISCORD"]
@@ -72,7 +74,7 @@ async def register(ctx: commands.Context, ign):
                        "and that the Discord you have linked matches your current discord name. Steps to change your linked Discord are shown above.")
         return
 
-    guild_data = requests.get(f"https://api.hypixel.net/guild?key={hypixel_api_key}&player={ign_uuid_cache[ign]}").json()
+    guild_data = requests.get(f"https://api.hypixel.net/guild?key={hypixel_api_key}&player={ign_uuid_cache[ign.lower()]}").json()
     await ctx.author.add_roles(ctx.guild.get_role(role_id=role_map["verified"]))
     if guild_data["guild"]:
         await ctx.author.edit(nick=f"{ign} [{guild_data['guild']['tag']}]")
@@ -86,7 +88,7 @@ async def register(ctx: commands.Context, ign):
         return
 
     for person in guild_data["guild"]["members"]:
-        if person["uuid"] == ign_uuid_cache[ign]:
+        if person["uuid"] == ign_uuid_cache[ign.lower()]:
             rank = person["rank"]
 
     await ctx.author.add_roles(ctx.guild.get_role(role_id=role_map[rank]))
