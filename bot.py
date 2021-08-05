@@ -84,7 +84,7 @@ async def register(ctx: commands.Context, ign):
         return
 
     if guild_data["guild"]["_id"] != exist_guild_id:
-        await ctx.send(f"You have now been verified as a member of {guild_data['guild']['tag']}.")
+        await ctx.send(f"You have now been verified as a member of {guild_data['g=registuild']['tag']}.")
         return
 
     for person in guild_data["guild"]["members"]:
@@ -94,18 +94,14 @@ async def register(ctx: commands.Context, ign):
     await ctx.author.add_roles(ctx.guild.get_role(role_id=role_map[rank]))
     await ctx.send(f"You have now been verified as a member of **[{guild_data['guild']['tag']}]** and have been given the {rank} role.")
 
-
-
-
-
-
-
-
 @register.error
 async def register_error(ctx: commands.Context, error):
     if isinstance(error, commands.MissingRequiredArgument):
         await ctx.send("**Correct Format:** !register <ign>")
+    elif isinstance(error, commands.CommandInvokeError) and isinstance(error.original, discord.errors.Forbidden):
+        await ctx.send("I'm not high enough in the heirarchy to give you your role or change your name ://")
     else:
+        print(error)
         raise error
 
 
