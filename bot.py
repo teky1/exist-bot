@@ -1,110 +1,52 @@
 import discord
 import requests
+import random
 from discord.ext import commands
 
 with open("bot_key.txt") as file:
     bot_key = file.read()
 
-with open("hypixel_api_key.txt") as file:
-    hypixel_api_key = file.read()
-
 client = commands.Bot(command_prefix="-", help_command=None)
 
-ign_uuid_cache = {
-    "teky1": "56977856afa34a3e8e645c1a6ba1ccae"
-}
+def formatName(num, name):
+    # remove old num
+    for i,x in enumerate(name):
+        if x != " " and not x.isnumeric():
+            name = name[i:]
+            break
 
-exist_guild_id = "5eea86688ea8c950b6cb5f1a"
+    return f"{num} {name}"
 
-#real
-role_map = {
-    "verified": 872556917061455894,
-    "when1": 834056868593926164,
-    "hm": 834056841621143604,
-    "What the duck": 834056990183391273,
-    "Creators": 834056803217702913,
-    "Officers": 834056803217702913,
-    "Member": 834056303978479616,
-    "Living": 834056303978479616
-}
+@client.command(name="paranoia")
+async def paranoia(ctx: commands.Context):
+    # check if persons in a vc
 
-#boop dev
-# role_map = {
-#     "verified": 872558221225758762,
-#     "when1": 872558303291506738,
-#     "hm": 872558349542113282,
-#     "What the duck": 872558393037062214,
-#     "Creators": 872558427539378236,
-#     "Officers": 872558427539378236,
-#     "Living": 872558456131964989,
-#     "Member": 872558456131964989
-# }
-
-@client.command(name="register")
-async def register(ctx: commands.Context, ign):
-    if ign.lower() in ign_uuid_cache:
-        data = requests.get(f"https://api.hypixel.net/player?key={hypixel_api_key}&uuid={ign_uuid_cache[ign.lower()]}").json()
-    else:
-        data = requests.get(f"https://api.hypixel.net/player?key={hypixel_api_key}&name={ign}").json()
-        if data["success"]:
-            if data["player"]:
-                ign_uuid_cache[ign.lower()] = data["player"]["uuid"]
-            else:
-                await ctx.send("I couldn't find a Minecraft account with that username :P")
-                return
-        else:
-            print(data)
-            await ctx.send("An error occurred. Please try again in a few minutes and if it still doesn't work DM <@!258048636653535234>")
-            return
-
-    ign = data["player"]["displayname"]
-
-    try:
-        discord = data["player"]["socialMedia"]["links"]["DISCORD"]
-    except KeyError:
-        await ctx.send("https://imgur.com/neS6wh1")
-        await ctx.send("That Minecraft account does **not** have a Discord account linked to it. "
-                       "To link a Discord account to your Minecraft account, log onto Hypixel and then follow the steps "
-                       "shown in the GIF above. If you follow these steps and are still having trouble, DM Teky#9703")
+    if ctx.message.author.voice is None:
+        await ctx.send("You need to be in a VC to use this command")
         return
 
-    if discord != f"{ctx.author.name}#{ctx.author.discriminator}":
-        await ctx.send("https://imgur.com/neS6wh1")
-        await ctx.send("That Minecraft account has a **different** Discord user linked to it. Please make sure that this is your Minecraft account "
-                       "and that the Discord you have linked matches your current discord name. Steps to change your linked Discord are shown above.")
-        return
+    # get whos in vc with them
 
-    guild_data = requests.get(f"https://api.hypixel.net/guild?key={hypixel_api_key}&player={ign_uuid_cache[ign.lower()]}").json()
-    await ctx.author.add_roles(ctx.guild.get_role(role_id=role_map["verified"]))
-    if guild_data["guild"]:
-        await ctx.author.edit(nick=f"{ign} [{guild_data['guild']['tag']}]")
-    else:
-        await ctx.author.edit(nick=f"{ign}")
-        await ctx.send("You have now been verified!")
-        return
+    vc = ctx.message.author.voice.channel
+    print(vc.name)
+    member_ids = list(vc.voice_states.keys())
+    members = await ctx.message.guild.query_members(limit=len(member_ids), user_ids=member_ids)
 
-    if guild_data["guild"]["_id"] != exist_guild_id:
-        await ctx.send(f"You have now been verified as a member of {guild_data['g=registuild']['tag']}.")
-        return
+    # assign them all random number
+    random.shuffle(members)
 
-    for person in guild_data["guild"]["members"]:
-        if person["uuid"] == ign_uuid_cache[ign.lower()]:
-            rank = person["rank"]
+    # add number to everyones name but if no perms then ping and tell them to do themselves
+    await ctx.send("Generating and assigning a random order...")
+    for i,member in enumerate(members):
+        new_name = formatName(i+1, member.display_name)
+        try:
+            await member.edit(nick=new_name)
+        except discord.errors.Forbidden:
+            await ctx.send(f"<@!{member.id}> I don't have perms to change your nick. "
+                           f"Please put a **{i+1}** in front of your name.")
+    await ctx.send("Done.")
 
-    await ctx.author.add_roles(ctx.guild.get_role(role_id=role_map[rank]))
-    await ctx.send(f"You have now been verified as a member of **[{guild_data['guild']['tag']}]** and have been given the {rank} role.")
-
-@register.error
-async def register_error(ctx: commands.Context, error):
-    if isinstance(error, commands.MissingRequiredArgument):
-        await ctx.send("**Correct Format:** !register <ign>")
-    elif isinstance(error, commands.CommandInvokeError) and isinstance(error.original, discord.errors.Forbidden):
-        await ctx.send("I'm not high enough in the heirarchy to give you your role or change your name ://")
-    else:
-        print(error)
-        raise error
-
-
+    return
 
 @client.event
 async def on_ready():
